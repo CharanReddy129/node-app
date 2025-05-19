@@ -1,3 +1,7 @@
 # ignore node_modules
 ./node_modules
 README.md
+./kubernetes
+.gitignore
+./git
+Dockerfile
