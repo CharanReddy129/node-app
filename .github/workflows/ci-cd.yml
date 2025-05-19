@@ -8,11 +8,13 @@ on:
     # workflow_dispatch:
 
 jobs:
-  security_scan:
+  Security_scan:
     runs-on: self-hosted
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       # - name: Set up Trivy
       #   run: |
       #     sudo apt-get install wget apt-transport-https gnupg lsb-release
@@ -27,12 +29,31 @@ jobs:
       - name: Gitleaks Scan
         run: gitleaks detect source . -f json
 
-  Image_build:
+  Sonar_scan:
     runs-on: self-hosted
-    needs: security_scan
+    needs: Security_scan
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5.1.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+
+  Image_build:
+    runs-on: self-hosted
+    needs: Sonar_scan
+    env:
+          IMAGE_NAME: node-app
+          IMAGE_TAG: latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Docker Login
         uses: docker/login-action@v3
         with:
@@ -45,6 +66,5 @@ jobs:
         with:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-        env:
-          IMAGE_NAME: node-app
-          IMAGE_TAG: latest
+      - name: Trivy image scan
+        run: trivy image ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
